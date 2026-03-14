@@ -1,0 +1,158 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  TEAM_BOY
+  PRINTING_SHOP
+  CLIENT
+}
+
+enum PartnerType {
+  TEAM_BOY
+  PRINTING_SHOP
+  AGENCY
+}
+
+enum OrderStatus {
+  DRAFT
+  PENDING
+  ASSIGNED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum ServiceType {
+  PAMPHLET_DISTRIBUTION
+  FLEX_BANNER
+  ELECTRIC_POLE_AD
+  SUNPACK_SHEET
+  WALL_POSTER
+  LOCAL_PROMOTION_PACKAGE
+}
+
+enum PaymentStatus {
+  CREATED
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
+}
+
+enum PaymentProvider {
+  RAZORPAY
+  PAYTM
+  STRIPE
+  CASH
+  OTHER
+}
+
+model User {
+  id        String   @id @default(cuid())
+  mobile    String   @unique
+  name      String?
+  email     String?  @unique
+  role      UserRole
+
+  partnerProfile PartnerProfile?
+  ordersCreated  Order[]       @relation("OrdersCreated")
+  ordersAsClient Order[]       @relation("OrdersClient")
+  payments       Payment[]   @relation("UserPayments")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model PartnerProfile {
+  id         String      @id @default(cuid())
+  userId     String      @unique
+  user       User        @relation(fields: [userId], references: [id])
+  type       PartnerType
+  area       String
+  idProofUrl String?
+  status     String      @default("PENDING") // e.g. PENDING / APPROVED / REJECTED
+
+  walletBalance   Decimal   @default(0)
+  commissionRate  Decimal   @default(0) // percentage e.g. 10 = 10%
+  ordersAssigned  Order[]   @relation("OrdersPartner")
+  teamBoyOrders   Order[]   @relation("OrdersTeamBoy")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Order {
+  id       String @id @default(cuid())
+  publicId String @unique // e.g. SSA-1023
+
+  clientName   String
+  clientMobile String
+  clientArea   String
+
+  serviceType ServiceType
+  status      OrderStatus @default(PENDING)
+  budget      Decimal?    // client budget
+  totalAmount Decimal?    // final billing amount
+
+  // Relationships
+  clientId     String?
+  client       User?        @relation("OrdersClient", fields: [clientId], references: [id])
+
+  createdById  String?
+  createdBy    User?        @relation("OrdersCreated", fields: [createdById], references: [id])
+
+  partnerId    String?
+  partner      PartnerProfile? @relation("OrdersPartner", fields: [partnerId], references: [id])
+
+  teamBoyId    String?
+  teamBoy      PartnerProfile? @relation("OrdersTeamBoy", fields: [teamBoyId], references: [id])
+
+  payments     Payment[]
+
+  meta         Json?      // e.g. routes, photos, notes
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Payment {
+  id        String          @id @default(cuid())
+  orderId   String
+  order     Order           @relation(fields: [orderId], references: [id])
+
+  userId    String?
+  user      User?           @relation("UserPayments", fields: [userId], references: [id])
+
+  amount    Decimal
+  currency  String          @default("INR")
+
+  status    PaymentStatus   @default(CREATED)
+  provider  PaymentProvider
+  providerPaymentId String? // Razorpay/Paytm/Stripe reference
+
+  meta      Json?           // raw gateway payload, failures etc.
+
+  createdAt DateTime @default(now())
+  paidAt    DateTime?
+}
+
+model RecommendationRequest {
+  id           String   @id @default(cuid())
+  area         String
+  budget       Decimal
+  goal         String? // e.g. admissions, branding, launch
+  servicesHint String? // text selection from UI
+
+  // Simple JSON suggestions e.g. { mix: [...], notes: "..." }
+  suggestion Json?
+
+  createdAt DateTime @default(now())
+}
+
