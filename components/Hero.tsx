@@ -1,6 +1,45 @@
+"use client";
+
 import Link from "next/link";
+import { useState } from "react";
 
 export function Hero() {
+  const [formData, setFormData] = useState({
+    name: "",
+    mobile: "",
+    location: "",
+    requirement: ""
+  });
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    try {
+      // Send enquiry to backend
+      const response = await fetch('/api/enquiries', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
+      });
+
+      if (response.ok) {
+        alert('Enquiry submitted successfully! We will contact you soon.');
+        setFormData({ name: "", mobile: "", location: "", requirement: "" });
+      } else {
+        alert('Failed to submit enquiry. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error submitting enquiry:', error);
+      alert('Error submitting enquiry. Please try again.');
+    }
+  };
   return (
     <section className="container-page grid gap-10 py-12 md:grid-cols-[3fr,2fr] md:items-center">
       <div className="space-y-6">
@@ -44,33 +83,48 @@ export function Hero() {
         <h2 className="mb-4 text-sm font-semibold text-slate-900 dark:text-slate-100">
           Quick Enquiry (Direct Clients)
         </h2>
-        <form className="space-y-3 text-xs">
+        <form className="space-y-3 text-xs" onSubmit={handleSubmit}>
           <input
             className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none focus:border-primary dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
             placeholder="Name"
+            name="name"
+            value={formData.name}
+            onChange={handleInputChange}
+            required
           />
           <input
             className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none focus:border-primary dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
             placeholder="Mobile / WhatsApp"
+            name="mobile"
+            value={formData.mobile}
+            onChange={handleInputChange}
+            required
           />
           <input
             className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none focus:border-primary dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
             placeholder="Location (e.g. Pratap Nagar)"
+            name="location"
+            value={formData.location}
+            onChange={handleInputChange}
+            required
           />
           <textarea
             className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none focus:border-primary dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
             rows={3}
             placeholder="Tell us about your promotion requirement…"
+            name="requirement"
+            value={formData.requirement}
+            onChange={handleInputChange}
+            required
           />
           <button
-            type="button"
+            type="submit"
             className="w-full rounded-lg bg-primary px-3 py-2 font-semibold text-white hover:bg-primary-dark"
           >
             Submit Enquiry
           </button>
           <p className="text-[11px] text-slate-500 dark:text-slate-400">
-            You will get an auto-reply email / WhatsApp once full backend is
-            connected.
+            You will get an auto-reply email / WhatsApp once full backend is connected.
           </p>
         </form>
       </div>

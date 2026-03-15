@@ -143,6 +143,20 @@ model Payment {
   paidAt    DateTime?
 }
 
+model Enquiry {
+  id          String   @id @default(cuid())
+  name        String
+  mobile      String
+  location    String
+  requirement String
+  status      String   @default("PENDING")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([mobile])
+  @@index([status])
+}
+
 model RecommendationRequest {
   id           String   @id @default(cuid())
   area         String

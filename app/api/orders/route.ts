@@ -1,67 +1,128 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "../../../lib/prisma";
+import { prisma } from "@/lib/prisma";
 import { ServiceType, OrderStatus } from "@prisma/client";
-import { sendOrderConfirmation } from "../../../lib/notifications";
 
-// GET /api/orders – simple list for admin dashboard
+// In-memory storage for development (when no database is configured)
+const inMemoryOrders: any[] = [];
+let orderCounter = 1000;
+const hasDatabase = !!process.env.DATABASE_URL;
+
+// GET /api/orders – list orders for admin dashboard
 export async function GET() {
-  const orders = await prisma.order.findMany({
-    take: 50,
-    orderBy: { createdAt: "desc" },
-    include: {
-      partner: true,
-      teamBoy: true
+  try {
+    let orders;
+    
+    if (hasDatabase) {
+      orders = await prisma.order.findMany({
+        orderBy: { createdAt: "desc" },
+        include: {
+          client: { select: { id: true, name: true, mobile: true } },
+          partner: { select: { id: true, type: true, area: true } },
+          teamBoy: { select: { id: true, type: true, area: true } }
+        }
+      });
+    } else {
+      orders = [...inMemoryOrders].reverse();
     }
-  });
 
-  return NextResponse.json({ orders });
+    return NextResponse.json({ orders });
+  } catch (error) {
+    console.error("Error fetching orders:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch orders" },
+      { status: 500 }
+    );
+  }
 }
 
-// POST /api/orders – stub to create an order from client or partner
+// POST /api/orders – create an order from client
 export async function POST(req: NextRequest) {
-  const body = await req.json().catch(() => null);
-  if (!body) {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
-  }
-
-  const {
-    clientName,
-    clientMobile,
-    clientArea,
-    serviceType,
-    budget,
-    createdById
-  } = body as {
-    clientName: string;
-    clientMobile: string;
-    clientArea: string;
-    serviceType: ServiceType;
-    budget?: string | number;
-    createdById?: string;
-  };
-
-  if (!clientName || !clientMobile || !clientArea || !serviceType) {
-    return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
-  }
-
-  const count = await prisma.order.count();
-  const publicId = `SSA-${1000 + count}`;
-
-  const order = await prisma.order.create({
-    data: {
-      publicId,
-      clientName,
-      clientMobile,
-      clientArea,
-      serviceType,
-      status: OrderStatus.PENDING,
-      budget: budget ? Number(budget) : null,
-      createdById: createdById ?? null
+  try {
+    const body = await req.json();
+    
+    // Validation
+    if (!body.clientName || !body.clientMobile || !body.clientArea || !body.serviceType) {
+      return NextResponse.json(
+        { error: "Missing required fields" },
+        { status: 400 }
+      );
     }
-  });
 
-  await sendOrderConfirmation({ order });
+    // Validate service type
+    const validServiceTypes = [
+      "PAMPHLET_DISTRIBUTION",
+      "FLEX_BANNER",
+      "ELECTRIC_POLE_AD",
+      "SUNPACK_SHEET",
+      "WALL_POSTER",
+      "LOCAL_PROMOTION_PACKAGE"
+    ];
+    if (!validServiceTypes.includes(body.serviceType)) {
+      return NextResponse.json(
+        { error: "Invalid service type" },
+        { status: 400 }
+      );
+    }
 
-  return NextResponse.json({ order }, { status: 201 });
+    let order;
+    
+    if (hasDatabase) {
+      // Generate public ID (e.g., SSA-1001)
+      const lastOrder = await prisma.order.findFirst({
+        orderBy: { createdAt: "desc" }
+      });
+      const nextId = lastOrder ? parseInt(lastOrder.publicId.split("-")[1]) + 1 : 1001;
+      const publicId = `SSA-${nextId}`;
+
+      // Create order in database
+      order = await prisma.order.create({
+        data: {
+          publicId,
+          clientName: body.clientName,
+          clientMobile: body.clientMobile,
+          clientArea: body.clientArea,
+          serviceType: body.serviceType as ServiceType,
+          status: OrderStatus.PENDING,
+          budget: body.budget ? parseFloat(body.budget) : null
+        }
+      });
+    } else {
+      // In-memory storage for development
+      orderCounter++;
+      order = {
+        id: `order-${Date.now()}`,
+        publicId: `SSA-${orderCounter}`,
+        clientName: body.clientName,
+        clientMobile: body.clientMobile,
+        clientArea: body.clientArea,
+        serviceType: body.serviceType,
+        status: "PENDING",
+        budget: body.budget ? parseFloat(body.budget) : null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      inMemoryOrders.push(order);
+    }
+
+    console.log("New order created:", order);
+
+    return NextResponse.json({
+      success: true,
+      message: "Order created successfully",
+      order: {
+        id: order.id,
+        publicId: order.publicId,
+        clientName: order.clientName,
+        status: order.status
+      }
+    });
+
+  } catch (error) {
+    console.error("Error creating order:", error);
+    return NextResponse.json(
+      { error: "Failed to create order" },
+      { status: 500 }
+    );
+  }
 }
 

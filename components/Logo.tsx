@@ -1,21 +1,27 @@
+import Image from "next/image";
+import Link from "next/link";
+
 export function Logo() {
   return (
-    <div className="flex items-center gap-3">
-      <div className="h-12 w-12 rounded-full bg-white shadow-lg flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-xs font-bold bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 bg-clip-text text-transparent">
-            श्री श्याम
-          </div>
-        </div>
+    <Link href="/" className="flex items-center gap-3">
+      <div className="h-12 w-12 rounded-full bg-white shadow-lg flex items-center justify-center overflow-hidden">
+        <Image
+          src="/logo.jpg"
+          alt="Shree Shyam Advertising Agency"
+          width={48}
+          height={48}
+          className="object-cover w-full h-full"
+          priority
+        />
       </div>
       <div>
         <div className="text-lg font-bold text-primary">
           Shree Shyam
         </div>
-        <div className="text-xs text-slate-600 dark:text-slate-400">
+        <div className="text-xs text-slate-600">
           Advertising & Marketing Agency – Jaipur
         </div>
       </div>
-    </div>
+    </Link>
   );
 }
